@@ -1,14 +1,14 @@
-import os
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
+import logging
+from supabase import create_client, Client
+from config import settings
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:password@localhost/secure_statements")
+# Configure logging
+logger = logging.getLogger(__name__)
 
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
+# Initialize Supabase Client
+try:
+    supabase: Client = create_client(settings.supabase_url, settings.supabase_key)
+except Exception as e:
+    logger.critical(f"Failed to initialize Supabase client: {e}")
+    raise
 
-def init_db():
-    # Import models to ensure they are registered with Base.metadata
-    import models
-    Base.metadata.create_all(bind=engine)
