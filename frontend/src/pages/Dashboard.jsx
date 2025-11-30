@@ -8,6 +8,7 @@ function Dashboard() {
   const [file, setFile] = useState(null);
   const [error, setError] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [downloadTokens, setDownloadTokens] = useState({});
   const navigate = useNavigate();
 
   const token = localStorage.getItem('sst_token');
@@ -83,9 +84,8 @@ function Dashboard() {
     }
   };
 
-  const handleDownload = async (docId) => {
+  const handleRequestDownload = async (docId) => {
     try {
-      // 1. Get Token
       const tokenResponse = await fetch(`${API_URL}/documents/${docId}/token`, {
         method: 'POST',
         headers: {
@@ -94,13 +94,31 @@ function Dashboard() {
       });
 
       if (!tokenResponse.ok) throw new Error('Failed to get download token');
-      const tokenData = await tokenResponse.json();
+      const data = await tokenResponse.json();
 
-      // 2. Trigger Download
-      const downloadUrl = `${API_URL}/download?token=${tokenData.token}`;
-      window.open(downloadUrl, '_blank');
+      // Activate download button for this document
+      setDownloadTokens(prev => ({
+        ...prev,
+        [docId]: { token: data.token, active: true }
+      }));
+
+      // Disable after 3 minutes (180000 ms)
+      setTimeout(() => {
+        setDownloadTokens(prev => ({
+          ...prev,
+          [docId]: { ...prev[docId], active: false }
+        }));
+      }, 180000);
+
     } catch (err) {
       setError(err.message);
+    }
+  };
+
+  const handleDownload = (docId) => {
+    const tokenData = downloadTokens[docId];
+    if (tokenData && tokenData.active) {
+      window.location.href = `${API_URL}/download?token=${tokenData.token}`;
     }
   };
 
@@ -108,7 +126,7 @@ function Dashboard() {
     <div>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <h1>Dashboard</h1>
-        <button onClick={handleLogout} style={{ backgroundColor: '#333' }}>Logout</button>
+        <button onClick={handleLogout} className="btn-logout">Logout</button>
       </header>
 
       <div className="card">
@@ -141,15 +159,36 @@ function Dashboard() {
               </tr>
             </thead>
             <tbody>
-              {documents.map((doc) => (
-                <tr key={doc.id}>
-                  <td>{doc.filename}</td>
-                  <td>{new Date(doc.uploaded_at).toLocaleString()}</td>
-                  <td>
-                    <button onClick={() => handleDownload(doc.id)}>Download</button>
-                  </td>
-                </tr>
-              ))}
+              {documents.map((doc) => {
+                const isDownloadActive = downloadTokens[doc.id]?.active;
+                return (
+                  <tr key={doc.id}>
+                    <td>{doc.filename}</td>
+                    <td>{new Date(doc.uploaded_at).toLocaleString()}</td>
+                    <td>
+                      <div style={{ display: 'flex', gap: '10px' }}>
+                        <button 
+                          onClick={() => handleRequestDownload(doc.id)}
+                          className="btn-secondary"
+                        >
+                          Request
+                        </button>
+                        <button 
+                          onClick={() => handleDownload(doc.id)} 
+                          disabled={!isDownloadActive}
+                          style={{ 
+                            opacity: isDownloadActive ? 1 : 0.5, 
+                            cursor: isDownloadActive ? 'pointer' : 'not-allowed',
+                            backgroundColor: isDownloadActive ? '#004c97' : '#ccc'
+                          }}
+                        >
+                          Download
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}

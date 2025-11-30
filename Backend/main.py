@@ -336,7 +336,11 @@ def request_download_token(
         response = supabase.table("documents").select("*").eq("id", doc_id).eq("owner_id", current_user.id).limit(1).execute()
         if not response.data:
             raise HTTPException(status_code=404, detail="Document not found")
-        doc = Document(**response.data[0])
+        # Ensure it's a dict
+        doc_data = response.data[0]
+        if not isinstance(doc_data, dict):
+             raise ValueError("Invalid data format")
+        doc = Document(**doc_data)
     except Exception as e:
         if isinstance(e, HTTPException):
             raise e
