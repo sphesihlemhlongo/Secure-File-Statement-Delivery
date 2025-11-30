@@ -14,11 +14,13 @@ from fastapi.responses import StreamingResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from passlib.context import CryptContext
 from jose import jwt, JWTError
+from google import genai
 
 from db import supabase
 from models import User, Document
 from config import settings
-from schemas import RegisterIn, Token, DocumentOut, DownloadTokenOut
+from schemas import RegisterIn, Token, DocumentOut, DownloadTokenOut, ChatRequest
+
 
 # Logging Setup
 logging.basicConfig(
@@ -382,6 +384,64 @@ def download_document(
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{doc.filename}"'}
     )
+
+async def get_optional_current_user(token: Optional[str] = Depends(oauth2_scheme)) -> Optional[User]:
+    """
+    Returns the current user if authenticated, else None.
+    Does not raise HTTPException for missing/invalid credentials.
+    """
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
+        id_selector: Optional[str] = payload.get("sub")
+        if id_selector is None:
+            return None
+    except JWTError:
+        return None
+    
+    try:
+        response = supabase.table("users").select("*").eq("id_selector", id_selector).limit(1).execute()
+        if not response.data:
+            return None
+        user_data = response.data[0]
+        return User(**user_data)
+    except Exception:
+        return None
+
+# AI Chatbot
+# The client gets the API key from the environment variable `GEMINI_API_KEY` or we pass it directly.
+# We use the settings.gemini_api_key which maps to the 'Gemini' env var.
+client = genai.Client(api_key=settings.gemini_api_key)
+
+@app.post("/api/chat")
+async def chat_endpoint(
+    request: ChatRequest,
+    current_user: Optional[User] = Depends(get_optional_current_user)
+):
+    try:
+        user_context = ""
+        if current_user:
+            user_context = f"The user's name is {current_user.name}. Address them by name occasionally."
+
+        system_prompt = (
+            "You are a helpful and friendly financial security assistant for Capitec's Secure Statement Delivery system. "
+            "Your goal is to help users with financial security questions and how to use this system. "
+            "The system allows users to upload PDF statements, view them, and generate secure, time-limited download links (valid for 3 minutes). "
+            "Keep your answers short, concise, and friendly. "
+            f"{user_context} "
+            "Do not provide financial advice, only security best practices and system usage help. "
+            "If asked about things unrelated to financial security or this system, politely decline."
+        )
+        
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=f"{system_prompt}\n\nUser: {request.message}"
+        )
+        return {"response": response.text}
+    except Exception as e:
+        logger.error(f"Gemini API error: {e}")
+        raise HTTPException(status_code=500, detail="AI service unavailable")
 
 if __name__ == "__main__":
     import uvicorn

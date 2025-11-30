@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     # Storage
     upload_dir: str = Field(default="/app/uploads", validation_alias="UPLOAD_DIR")
 
+    # AI
+    gemini_api_key: str = Field(..., validation_alias="Gemini")
+
+
 # We use a try-except block to catch validation errors at import time if needed,
 # but letting it fail is also acceptable for "Validates presence of required env vars".
 try:

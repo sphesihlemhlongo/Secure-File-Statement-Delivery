@@ -19,3 +19,7 @@ class DocumentOut(BaseModel):
 class DownloadTokenOut(BaseModel):
     token: str
     expires_in: int
+
+class ChatRequest(BaseModel):
+    message: str
+
