@@ -30,7 +30,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Security Setup
-# Switched to argon2 to avoid bcrypt version incompatibilities and length limits
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
 
@@ -42,26 +41,21 @@ async def lifespan(app: FastAPI):
     """
     logger.info("Application startup: Initializing resources...")
     
-    # Log configuration status (without secrets)
+    # Logging configuration status (without secrets)
     logger.info(f"Upload Directory: {settings.upload_dir}")
     
     try:
         # Supabase Health Check
         logger.info("Verifying Supabase connection...")
-        # We perform a lightweight query to ensure connectivity.
-        # Assuming 'users' table exists. If not, this might fail, but that's intended.
-        # We use .select("count", count="exact").limit(1) or similar.
-        # Or just select id from users limit 1.
-        # If tables don't exist yet, this is a good time to fail or warn.
-        # Since we removed auto-migration, we assume tables are created via SQL scripts or Supabase dashboard.
+        
+        # Tables are created via SQL Supabase dashboard.
         response = supabase.table("users").select("id").limit(1).execute()
         logger.info("Supabase connection verified.")
     except Exception as e:
         logger.critical(f"CRITICAL: Supabase connection failed. Error: {e}")
-        # We will re-raise to prevent the app from starting in a broken state.
         raise
 
-    # Ensure upload directory exists
+    # Ensuring upload directory exists
     if not os.path.exists(settings.upload_dir):
         try:
             os.makedirs(settings.upload_dir)
@@ -145,13 +139,12 @@ def register(user_in: RegisterIn):
     
     id_selector = create_selector(user_in.id_number)
     
-    # Check if user exists
+    # Checking if user exists
     try:
         existing_user = supabase.table("users").select("id").eq("id_selector", id_selector).execute()
         if existing_user.data:
             raise HTTPException(status_code=400, detail="User already registered")
     except Exception as e:
-        # If it's the HTTPException we just raised, re-raise it
         if isinstance(e, HTTPException):
             raise e
         logger.error(f"Database error during registration check: {e}")
@@ -178,7 +171,7 @@ def register(user_in: RegisterIn):
         logger.error(f"Database error during registration insert: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
-    # Ensure created_user is a dict before accessing
+    # Ensuring created_user is a dict before accessing
     if not isinstance(created_user, dict):
          logger.error(f"Unexpected response format from Supabase: {created_user}")
          raise HTTPException(status_code=500, detail="Internal Server Error")
@@ -222,11 +215,11 @@ async def upload_document(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user)
 ):
-    # Validate file type
+    # Validating file type
     if not file.filename or file.content_type != "application/pdf" or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are allowed")
 
-    # Validate file size (read into memory to check size - for larger files, use chunked reading)
+    # Validating file size (reading into memory to check size - for larger files, using chunked reading)
     content = await file.read()
     if len(content) > 10 * 1024 * 1024:  # 10 MB
         raise HTTPException(status_code=413, detail="File too large (max 10MB)")
@@ -235,17 +228,17 @@ async def upload_document(
     timestamp = int(time.time())
     safe_filename = f"{timestamp}_{current_user.id}_{os.path.basename(file.filename)}"
     
-    # Use system temp directory for Vercel compatibility
+    # Using system temp directory for Vercel compatibility
     temp_dir = tempfile.gettempdir()
     temp_file_path = os.path.join(temp_dir, safe_filename)
 
     try:
-        # 1. Save to temp folder
+        # 1. Saving to temp folder
         with open(temp_file_path, "wb") as f:
             f.write(content)
             
-        # 2. Upload to Supabase Storage
-        # We use the 'documents' bucket. Ensure it exists in Supabase dashboard.
+        # 2. Uploading to Supabase Storage
+        # I used the 'documents' bucket in Supabase.
         storage_path = f"{current_user.id}/{safe_filename}"
         with open(temp_file_path, "rb") as f:
             supabase.storage.from_("documents").upload(
@@ -260,13 +253,13 @@ async def upload_document(
             os.remove(temp_file_path)
         raise HTTPException(status_code=500, detail="Could not save file")
     finally:
-        # Cleanup temp file
+        # Cleaning up temp file
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
 
     new_doc_data = {
         "filename": file.filename,
-        "filepath": storage_path, # Store storage path instead of local path
+        "filepath": storage_path, # Storing storage path instead of local path
         "owner_id": current_user.id,
         "uploaded_at": datetime.utcnow().isoformat()
     }
@@ -278,7 +271,6 @@ async def upload_document(
         created_doc = response.data[0]
     except Exception as e:
         logger.error(f"Database error during document upload: {e}")
-        # Note: We might want to delete from storage here if DB fails, but keeping it simple for now
         raise HTTPException(status_code=500, detail="Internal Server Error")
     
     if not isinstance(created_doc, dict):
@@ -299,7 +291,7 @@ def list_documents(
         logger.error(f"Database error listing documents: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
-# Download Token Logic
+# Downloading Token Logic
 
 def make_download_token(doc_id: int, owner_id: int) -> str:
     """
@@ -353,7 +345,6 @@ def request_download_token(
         response = supabase.table("documents").select("*").eq("id", doc_id).eq("owner_id", current_user.id).limit(1).execute()
         if not response.data:
             raise HTTPException(status_code=404, detail="Document not found")
-        # Ensure it's a dict
         doc_data = response.data[0]
         if not isinstance(doc_data, dict):
              raise ValueError("Invalid data format")
@@ -386,16 +377,13 @@ def download_document(
         logger.error(f"Database error during download: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
         
-    # Download from Supabase Storage to temp file
+    # Downloading from Supabase Storage to temp file
     try:
-        # Use system temp directory
         temp_dir = tempfile.gettempdir()
         temp_file_path = os.path.join(temp_dir, f"download_{doc.id}_{int(time.time())}.pdf")
         
-        # Download bytes
         file_bytes = supabase.storage.from_("documents").download(doc.filepath)
         
-        # Write to temp file
         with open(temp_file_path, "wb") as f:
             f.write(file_bytes)
             
@@ -408,7 +396,6 @@ def download_document(
             with open(temp_file_path, mode="rb") as file_like:
                 yield from file_like
         finally:
-            # Cleanup after serving
             if os.path.exists(temp_file_path):
                 try:
                     os.remove(temp_file_path)
@@ -446,8 +433,7 @@ async def get_optional_current_user(token: Optional[str] = Depends(oauth2_scheme
         return None
 
 # AI Chatbot
-# The client gets the API key from the environment variable `GEMINI_API_KEY` or we pass it directly.
-# We use the settings.gemini_api_key which maps to the 'Gemini' env var.
+# I used the settings.gemini_api_key which maps to the 'Gemini' env var.
 client = genai.Client(api_key=settings.gemini_api_key)
 
 @app.post("/api/chat")
@@ -461,7 +447,7 @@ async def chat_endpoint(
             user_context = f"The user's name is {current_user.name}. Address them by name occasionally."
 
         system_prompt = (
-            "You are a helpful and friendly financial security assistant for Capitec's Secure Statement Delivery system. "
+            "You are a helpful and friendly financial security assistant for Capitec's Secure File Statement Delivery system. "
             "Your goal is to help users with financial security questions and how to use this system. "
             "The system allows users to upload PDF statements, view them, and generate secure, time-limited download links (valid for 3 minutes). "
             "Keep your answers short, concise, and friendly. "
