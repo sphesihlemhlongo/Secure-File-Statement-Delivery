@@ -27,7 +27,7 @@ If you prefer to run the services locally without Docker:
 ### Prerequisites
 *   Python 3.9+
 *   Node.js 18+
-*   PostgreSQL (or a Supabase project)
+*   PostgreSQL (a Supabase project)
 
 ### 1. Backend Setup
 1.  Navigate to the backend directory:
