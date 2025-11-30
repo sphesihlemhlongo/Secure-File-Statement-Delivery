@@ -19,21 +19,14 @@ class Settings(BaseSettings):
     download_token_ttl_seconds: int = Field(default=180, validation_alias="DOWNLOAD_TOKEN_TTL_SECONDS")
 
     # Storage
-    # On Vercel, we should use /tmp, but we handle this in main.py dynamically now.
-    # This setting is kept for backward compatibility or local dev if needed, 
-    # though main.py now prefers tempfile.gettempdir()
     upload_dir: str = Field(default="/tmp", validation_alias="UPLOAD_DIR")
 
     # AI
     gemini_api_key: str = Field(..., validation_alias="Gemini")
 
-
-# We use a try-except block to catch validation errors at import time if needed,
-# but letting it fail is also acceptable for "Validates presence of required env vars".
 try:
     settings = Settings()
 except Exception as e:
     print(f"Configuration Error: {e}")
-    # In production, you might want to exit here, but for now we let it crash naturally or handle it in main.
     raise
 
