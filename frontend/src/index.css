@@ -178,3 +178,20 @@ tr:last-child td {
   font-size: 0.9rem;
   border-left: 4px solid var(--brand-red);
 }
+
+/* Chatbot Animation */
+@keyframes vibrate-periodic {
+  0%, 85% { transform: rotate(0deg); }
+  86% { transform: rotate(10deg); }
+  88% { transform: rotate(-10deg); }
+  90% { transform: rotate(10deg); }
+  92% { transform: rotate(-10deg); }
+  94% { transform: rotate(5deg); }
+  96% { transform: rotate(-5deg); }
+  98% { transform: rotate(0deg); }
+  100% { transform: rotate(0deg); }
+}
+
+.chatbot-vibrate {
+  animation: vibrate-periodic 5s ease-in-out infinite;
+}

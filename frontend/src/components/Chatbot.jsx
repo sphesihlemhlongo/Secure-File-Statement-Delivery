@@ -152,6 +152,7 @@ const Chatbot = () => {
 
       <button
         onClick={toggleChat}
+        className={!isOpen ? "chatbot-vibrate" : ""}
         style={{
           width: '60px',
           height: '60px',
