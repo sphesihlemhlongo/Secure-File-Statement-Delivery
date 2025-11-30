@@ -5,7 +5,7 @@ from config import settings
 # Configure logging
 logger = logging.getLogger(__name__)
 
-# Initialize Supabase Client
+# Initializing Supabase Client
 try:
     supabase: Client = create_client(settings.supabase_url, settings.supabase_key)
 except Exception as e:
