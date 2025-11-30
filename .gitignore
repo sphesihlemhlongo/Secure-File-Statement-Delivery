@@ -109,3 +109,7 @@ config/secrets.*
 
 .venv/
 venv/
+DEPLOY.md
+HARDENING.md
+RISK_MATRIX.md
+TESTING.md
