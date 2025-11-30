@@ -28,7 +28,7 @@ services:
       SERVER_SELECTOR_SECRET: "dev-selector-secret-change-me"
       DOWNLOAD_SECRET: "dev-download-secret-change-me"
       ACCESS_TOKEN_EXPIRE_MINUTES: 30
-      DOWNLOAD_TOKEN_TTL_SECONDS: 900
+      DOWNLOAD_TOKEN_TTL_SECONDS: 180
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
       interval: 30s

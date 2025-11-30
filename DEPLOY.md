@@ -31,7 +31,7 @@ Set the following environment variables in your deployment platform (Railway, AW
 | `SERVER_SELECTOR_SECRET` | Key for HMAC ID selector | `long-random-string-2` |
 | `DOWNLOAD_SECRET` | Key for signing download tokens | `long-random-string-3` |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | JWT validity duration | `30` |
-| `DOWNLOAD_TOKEN_TTL_SECONDS` | Download token validity | `900` |
+| `DOWNLOAD_TOKEN_TTL_SECONDS` | Download token validity | `180` |
 
 ### Secrets Management
 *   **Railway**: Add these under the "Variables" tab. Railway encrypts them at rest.

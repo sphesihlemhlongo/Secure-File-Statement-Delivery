@@ -60,7 +60,7 @@ Replace `<DOC_ID>` with the ID from the list.
 curl -X POST "http://localhost:8000/api/documents/<DOC_ID>/token" \
   -H "Authorization: Bearer <TOKEN>"
 ```
-*Response: `{"token": "...", "expires_in": 900}`*
+*Response: `{"token": "...", "expires_in": 180}`*
 
 ### 6. Download File
 Replace `<DOWNLOAD_TOKEN>` with the token received.

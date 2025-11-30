@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     download_secret: str = Field(..., validation_alias="DOWNLOAD_SECRET")
     algorithm: str = "HS256"
     access_token_expire_minutes: int = Field(default=30, validation_alias="ACCESS_TOKEN_EXPIRE_MINUTES")
-    download_token_ttl_seconds: int = Field(default=900, validation_alias="DOWNLOAD_TOKEN_TTL_SECONDS")
+    download_token_ttl_seconds: int = Field(default=180, validation_alias="DOWNLOAD_TOKEN_TTL_SECONDS")
 
     # Storage
     upload_dir: str = Field(default="/app/uploads", validation_alias="UPLOAD_DIR")

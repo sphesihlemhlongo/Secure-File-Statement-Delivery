@@ -9,9 +9,15 @@ function Dashboard() {
   const [error, setError] = useState('');
   const [uploading, setUploading] = useState(false);
   const [downloadTokens, setDownloadTokens] = useState({});
+  const [now, setNow] = useState(Date.now());
   const navigate = useNavigate();
 
   const token = localStorage.getItem('sst_token');
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (!token) {
@@ -97,18 +103,11 @@ function Dashboard() {
       const data = await tokenResponse.json();
 
       // Activate download button for this document
+      const expiresAt = Date.now() + (data.expires_in * 1000);
       setDownloadTokens(prev => ({
         ...prev,
-        [docId]: { token: data.token, active: true }
+        [docId]: { token: data.token, expiresAt }
       }));
-
-      // Disable after 3 minutes (180000 ms)
-      setTimeout(() => {
-        setDownloadTokens(prev => ({
-          ...prev,
-          [docId]: { ...prev[docId], active: false }
-        }));
-      }, 180000);
 
     } catch (err) {
       setError(err.message);
@@ -117,8 +116,22 @@ function Dashboard() {
 
   const handleDownload = (docId) => {
     const tokenData = downloadTokens[docId];
-    if (tokenData && tokenData.active) {
+    if (tokenData && tokenData.expiresAt > now) {
       window.location.href = `${API_URL}/download?token=${tokenData.token}`;
+    }
+  };
+
+  const handleCopyLink = async (docId) => {
+    const tokenData = downloadTokens[docId];
+    if (tokenData && tokenData.expiresAt > now) {
+      const link = `${API_URL}/download?token=${tokenData.token}`;
+      try {
+        await navigator.clipboard.writeText(link);
+        alert("Link copied to clipboard!");
+      } catch (err) {
+        console.error('Failed to copy:', err);
+        setError('Failed to copy link to clipboard');
+      }
     }
   };
 
@@ -160,13 +173,16 @@ function Dashboard() {
             </thead>
             <tbody>
               {documents.map((doc) => {
-                const isDownloadActive = downloadTokens[doc.id]?.active;
+                const tokenData = downloadTokens[doc.id];
+                const timeLeft = tokenData ? Math.max(0, Math.ceil((tokenData.expiresAt - now) / 1000)) : 0;
+                const isDownloadActive = timeLeft > 0;
+                
                 return (
                   <tr key={doc.id}>
                     <td>{doc.filename}</td>
                     <td>{new Date(doc.uploaded_at).toLocaleString()}</td>
                     <td>
-                      <div style={{ display: 'flex', gap: '10px' }}>
+                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                         <button 
                           onClick={() => handleRequestDownload(doc.id)}
                           className="btn-secondary"
@@ -182,7 +198,19 @@ function Dashboard() {
                             backgroundColor: isDownloadActive ? '#004c97' : '#ccc'
                           }}
                         >
-                          Download
+                          Download {isDownloadActive ? `(${Math.floor(timeLeft / 60)}:${(timeLeft % 60).toString().padStart(2, '0')})` : ''}
+                        </button>
+                        <button 
+                          onClick={() => handleCopyLink(doc.id)} 
+                          disabled={!isDownloadActive}
+                          className="btn-secondary"
+                          style={{ 
+                            opacity: isDownloadActive ? 1 : 0.5, 
+                            cursor: isDownloadActive ? 'pointer' : 'not-allowed',
+                            backgroundColor: isDownloadActive ? '#2F70EF' : '#ccc'
+                          }}
+                        >
+                          Copy Link
                         </button>
                       </div>
                     </td>
