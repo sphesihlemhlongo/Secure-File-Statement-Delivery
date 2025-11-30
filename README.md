@@ -72,8 +72,6 @@ If you prefer to run the services locally without Docker:
 
 ## Manual Verification (Smoke Test)
 
-## Manual Verification (Smoke Test)
-
 You can verify the backend endpoints using `curl` or the Swagger UI at `/docs`.
 
 ### 1. Register
