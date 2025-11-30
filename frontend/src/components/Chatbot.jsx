@@ -35,7 +35,7 @@ const Chatbot = () => {
     }
 
     try {
-      const response = await fetch('http://localhost:8000/api/chat', {
+      const response = await fetch('https://securefilestatementdeliverybackend.vercel.app/api/chat', {
         method: 'POST',
         headers: headers,
         body: JSON.stringify({ message: userMessage }),
