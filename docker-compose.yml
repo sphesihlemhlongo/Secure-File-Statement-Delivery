@@ -1,17 +1,6 @@
 version: '3.8'
 
 services:
-  db:
-    image: postgres:15
-    environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: secure_statements
-    volumes:
-      - db-data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-
   backend:
     build: ./Backend
     ports:
@@ -19,14 +8,11 @@ services:
     volumes:
       - ./Backend:/app
       - uploads:/app/uploads
-    depends_on:
-      - db
+    env_file:
+      - ./Backend/.env
     environment:
-      DATABASE_URL: postgresql://user:password@db:5432/secure_statements
-      # SECURITY WARNING: Replace these with secure random strings in production!
-      SECRET_KEY: "dev-secret-key-change-me"
-      SERVER_SELECTOR_SECRET: "dev-selector-secret-change-me"
-      DOWNLOAD_SECRET: "dev-download-secret-change-me"
+      # App Config
+      UPLOAD_DIR: "/app/uploads"
       ACCESS_TOKEN_EXPIRE_MINUTES: 30
       DOWNLOAD_TOKEN_TTL_SECONDS: 180
     healthcheck:
@@ -43,5 +29,4 @@ services:
       - backend
 
 volumes:
-  db-data:
   uploads:
