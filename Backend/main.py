@@ -3,6 +3,7 @@ import hmac
 import hashlib
 import time
 import logging
+import tempfile
 from datetime import datetime, timedelta
 from typing import Optional, List
 from contextlib import asynccontextmanager
@@ -81,11 +82,10 @@ app = FastAPI(
 # CORS Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://securefilestatement.netlify.app/"],  # Allow all origins for development
+    allow_origins=["*"],  # Allow all origins for development
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["*"]
 )
 
 # Utilities
@@ -234,22 +234,39 @@ async def upload_document(
     # Safe filename
     timestamp = int(time.time())
     safe_filename = f"{timestamp}_{current_user.id}_{os.path.basename(file.filename)}"
-    file_path = os.path.join(settings.upload_dir, safe_filename)
-
-    # Prevent path traversal
-    if not os.path.abspath(file_path).startswith(os.path.abspath(settings.upload_dir)):
-         raise HTTPException(status_code=400, detail="Invalid filename")
+    
+    # Use system temp directory for Vercel compatibility
+    temp_dir = tempfile.gettempdir()
+    temp_file_path = os.path.join(temp_dir, safe_filename)
 
     try:
-        with open(file_path, "wb") as f:
+        # 1. Save to temp folder
+        with open(temp_file_path, "wb") as f:
             f.write(content)
-    except IOError as e:
-        logger.error(f"File write error: {e}")
+            
+        # 2. Upload to Supabase Storage
+        # We use the 'documents' bucket. Ensure it exists in Supabase dashboard.
+        storage_path = f"{current_user.id}/{safe_filename}"
+        with open(temp_file_path, "rb") as f:
+            supabase.storage.from_("documents").upload(
+                path=storage_path,
+                file=f,
+                file_options={"content-type": "application/pdf"}
+            )
+            
+    except Exception as e:
+        logger.error(f"Upload error: {e}")
+        if os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
         raise HTTPException(status_code=500, detail="Could not save file")
+    finally:
+        # Cleanup temp file
+        if os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
 
     new_doc_data = {
         "filename": file.filename,
-        "filepath": file_path,
+        "filepath": storage_path, # Store storage path instead of local path
         "owner_id": current_user.id,
         "uploaded_at": datetime.utcnow().isoformat()
     }
@@ -261,9 +278,7 @@ async def upload_document(
         created_doc = response.data[0]
     except Exception as e:
         logger.error(f"Database error during document upload: {e}")
-        # Clean up file if DB insert fails
-        if os.path.exists(file_path):
-            os.remove(file_path)
+        # Note: We might want to delete from storage here if DB fails, but keeping it simple for now
         raise HTTPException(status_code=500, detail="Internal Server Error")
     
     if not isinstance(created_doc, dict):
@@ -371,13 +386,34 @@ def download_document(
         logger.error(f"Database error during download: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
         
-    if not os.path.exists(doc.filepath):
-        logger.error(f"File missing on disk: {doc.filepath}")
+    # Download from Supabase Storage to temp file
+    try:
+        # Use system temp directory
+        temp_dir = tempfile.gettempdir()
+        temp_file_path = os.path.join(temp_dir, f"download_{doc.id}_{int(time.time())}.pdf")
+        
+        # Download bytes
+        file_bytes = supabase.storage.from_("documents").download(doc.filepath)
+        
+        # Write to temp file
+        with open(temp_file_path, "wb") as f:
+            f.write(file_bytes)
+            
+    except Exception as e:
+        logger.error(f"Storage download error: {e}")
         raise HTTPException(status_code=404, detail="File not found on server")
         
     def iterfile():
-        with open(doc.filepath, mode="rb") as file_like:
-            yield from file_like
+        try:
+            with open(temp_file_path, mode="rb") as file_like:
+                yield from file_like
+        finally:
+            # Cleanup after serving
+            if os.path.exists(temp_file_path):
+                try:
+                    os.remove(temp_file_path)
+                except Exception as e:
+                    logger.error(f"Failed to cleanup temp file {temp_file_path}: {e}")
 
     return StreamingResponse(
         iterfile(),

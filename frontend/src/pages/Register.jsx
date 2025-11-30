@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 
-const API_URL = 'https://securefilestatementdeliverybackend.vercel.app';
+const API_URL = 'https://securefilestatementdeliverybackend.vercel.app/api';
 
 function Register() {
   const [name, setName] = useState('');

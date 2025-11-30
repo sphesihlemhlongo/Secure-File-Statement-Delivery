@@ -19,7 +19,10 @@ class Settings(BaseSettings):
     download_token_ttl_seconds: int = Field(default=180, validation_alias="DOWNLOAD_TOKEN_TTL_SECONDS")
 
     # Storage
-    upload_dir: str = Field(default="/app/uploads", validation_alias="UPLOAD_DIR")
+    # On Vercel, we should use /tmp, but we handle this in main.py dynamically now.
+    # This setting is kept for backward compatibility or local dev if needed, 
+    # though main.py now prefers tempfile.gettempdir()
+    upload_dir: str = Field(default="/tmp", validation_alias="UPLOAD_DIR")
 
     # AI
     gemini_api_key: str = Field(..., validation_alias="Gemini")

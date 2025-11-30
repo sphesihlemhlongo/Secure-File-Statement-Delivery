@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-const API_URL = 'https://securefilestatementdeliverybackend.vercel.app';
+const API_URL = 'https://securefilestatementdeliverybackend.vercel.app/api';
 
 function Dashboard() {
   const [documents, setDocuments] = useState([]);
