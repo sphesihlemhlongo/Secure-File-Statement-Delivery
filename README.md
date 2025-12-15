@@ -48,7 +48,7 @@ If you prefer to run the services locally without Docker:
     ```
 4.  Configure Environment:
     *   Copy `.env.example` to `.env`.
-    *   Update `DATABASE_URL` to point to your local Postgres or Supabase instance.
+    *   Update `DATABASE_URL` to point to Supabase instance.
     *   Set `Gemini` API key in `.env`.
 5.  Run the server:
     ```bash
